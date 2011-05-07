@@ -39,20 +39,32 @@ inline long count_bits_sse(unsigned char *buffer, size_t bufsize)
         // do {
         "1:"
         //     bitcount = popcnt(*buffer);
-        "popcnt (%4), %2;"
+        "popcnt (%[buffer]), %[bitcount];"
         //     total += bitcount;
-        "add %2, %0;"
+        "add %[bitcount], %[total];"
         //     buffer += chunk_size;
-        "add %3, %4;"
+        "add %[chunk_size], %[buffer];"
         // } while(--total);
         "loop 1b;"
 
         // Output values
-        : "=&r" (total),  "=&c" (iterations), "=&r" (bitcount)
+        :   [total]         "=&r"       (total), 
+            [bitcount]      "=&r"       (bitcount),
+            // ecx and buffer are really clobbered rather than output,
+            // but gcc seems to like it better if we list them here.
+            [ecx]           "=&c"       (iterations), 
+            [buffer]        "=&r"       (buffer)
+
         // Input values
-        : "i" (chunk_size), "r" (buffer), "1" (iterations), "0" (0)
+        :   [chunk_size]    "i"         (chunk_size), 
+                            "[buffer]"  (buffer), 
+                            "[ecx]"     (iterations), 
+                            "[total]"   (0)
+
         // Clobbered registers
-        : "cc", "4"
+        // We pretty much declared them all as outputs, so they don't
+        // need to be listed again.
+        :   "cc"
     );
     return total;
 }
