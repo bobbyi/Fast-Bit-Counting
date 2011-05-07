@@ -26,33 +26,33 @@ inline long count_bits_intrinsic(unsigned char *buffer, size_t bufsize)
 
 inline long count_bits_sse(unsigned char *buffer, size_t bufsize)
 {
-    const size_t iterations = bufsize / chunk_size;
+    size_t iterations = bufsize / chunk_size;
     if (!iterations)
         return 0;
-    // We clobber ecx, but gcc won't let us declare ecx as clobbered.
-    // so instead we declare it as output into this dummy output variable.
-    int ecx; 
     // This is a dummy output variable for the bitcount
     // calculated in each iteration.
     // Which is really a temporary register that we are clobbering.
     long bitcount;
-    // The actual output variable.
     long total;
 
     __asm__ (
         // do {
         "1:"
         //     bitcount = popcnt(*buffer);
-        "popcnt (%1), %0;"
+        "popcnt (%4), %2;"
         //     total += bitcount;
-        "add %0, %3;"
+        "add %2, %0;"
         //     buffer += chunk_size;
-        "add %5, %1;"
+        "add %3, %4;"
         // } while(--total);
         "loop 1b;"
-        : "=&r" (bitcount), "=&r" (buffer), "=&c" (ecx), "=&r" (total)
-        : "1" (buffer), "i" (chunk_size), "2" (iterations), "3" (total)
-        : "cc"
+
+        // Output values
+        : "=&r" (total),  "=&c" (iterations), "=&r" (bitcount)
+        // Input values
+        : "i" (chunk_size), "r" (buffer), "1" (iterations), "0" (0)
+        // Clobbered registers
+        : "cc", "4"
     );
     return total;
 }
