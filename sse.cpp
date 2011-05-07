@@ -3,16 +3,17 @@
 #include <string.h>
 #include <time.h>
 
+typedef unsigned char uchar;
 // We loop through one unsigned long at a time
 typedef unsigned long chunk_t;
 const static int chunk_size = sizeof(chunk_t);
 
-long count_bits_fast(unsigned char *buffer, size_t bufsize);
-long count_bits_naive(unsigned char *buffer, size_t bufsize);
+long count_bits_fast(uchar *buffer, size_t bufsize);
+long count_bits_naive(uchar *buffer, size_t bufsize);
 // helper for count_bits_fast
-inline long count_bits_sse(unsigned char *buffer, size_t bufsize);
+inline long count_bits_sse(uchar *buffer, size_t bufsize);
 
-inline long count_bits_intrinsic(unsigned char *buffer, size_t bufsize)
+inline long count_bits_intrinsic(uchar *buffer, size_t bufsize)
 {
     const int iterations = bufsize / chunk_size;
     if (!iterations)
@@ -24,7 +25,7 @@ inline long count_bits_intrinsic(unsigned char *buffer, size_t bufsize)
     return total;
 }
 
-inline long count_bits_sse(unsigned char *buffer, size_t bufsize)
+inline long count_bits_sse(uchar *buffer, size_t bufsize)
 {
     size_t iterations = bufsize / chunk_size;
     if (!iterations)
@@ -69,7 +70,7 @@ inline long count_bits_sse(unsigned char *buffer, size_t bufsize)
     return total;
 }
 
-long count_bits_fast(unsigned char *buffer, size_t bufsize)
+long count_bits_fast(uchar *buffer, size_t bufsize)
 {
     const size_t aligned_size = (bufsize / chunk_size) * chunk_size;
     long bitcount = count_bits_sse(buffer, bufsize);
@@ -77,7 +78,7 @@ long count_bits_fast(unsigned char *buffer, size_t bufsize)
     return bitcount;
 }
 
-long count_bits_naive(unsigned char *buffer, size_t bufsize)
+long count_bits_naive(uchar *buffer, size_t bufsize)
 {
     long bitcount = 0;
     for(size_t byte = 0; byte < bufsize; byte++)
@@ -98,7 +99,7 @@ int main(int argc, char **argv)
     printf("Using %d megs of data\n", megs_of_data);
 
     size_t bufsize = megs_of_data * 1024 * 1024;
-    unsigned char *buffer = new unsigned char[bufsize];
+    uchar *buffer = new unsigned char[bufsize];
 
     printf("Reading input...\n");
     FILE *infile = fopen(filename, "r");
