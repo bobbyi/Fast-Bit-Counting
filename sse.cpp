@@ -1,31 +1,77 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
 #include <time.h>
 
 typedef unsigned char uchar;
+
 // We loop through one unsigned long at a time
-typedef unsigned long chunk_t;
+typedef const unsigned long chunk_t;
 const static int chunk_size = sizeof(chunk_t);
 
-long count_bits_fast(uchar *buffer, size_t bufsize);
-long count_bits_naive(uchar *buffer, size_t bufsize);
-// helper for count_bits_fast
-inline long count_bits_sse(uchar *buffer, size_t bufsize);
+// Define what a bit counting function looks like
+typedef long bit_counting_function(const uchar *buffer, size_t bufsize);
 
-inline long count_bits_intrinsic(uchar *buffer, size_t bufsize)
+// The various implementations of bit counting functions
+bit_counting_function count_bits_naive;
+bit_counting_function count_bits_fast;
+bit_counting_function count_bits_intrinsic;
+// helper for count_bits_fast
+bit_counting_function count_bits_sse;
+
+// Timer
+void time_bit_counting(bit_counting_function *func, int iters, const uchar *buffer, size_t bufsize);
+
+long count_bits_naive(const uchar *buffer, size_t bufsize)
 {
-    const int iterations = bufsize / chunk_size;
-    if (!iterations)
-        return 0;
     long bitcount = 0;
-    long total;
-    for (size_t i =0; i < iterations; i ++)
-        ;
+    for(size_t byte = 0; byte < bufsize; byte++)
+        for(int bit = 0; bit < 8; bit++)
+            if (buffer[byte] & (1 << bit))
+                bitcount++;
+    return bitcount;
+}
+
+long count_bits_chunked(bit_counting_function *func, const uchar *buffer, size_t bufsize)
+{
+    const size_t num_chunks = bufsize / chunk_size;
+    const size_t chunked_bufsize = num_chunks * chunk_size;
+    const size_t leftover = bufsize - chunked_bufsize;
+    const int leftover = bufsize - iterations * chunk_size;
+    long total = func(buffer, bufsize -;
+    for (size_t i = 0; i < iterations; i++)
+    {
+        chunk_t chunk = *reinterpret_cast<chunk_t *>(buffer);
+        total += __builtin_popcountl(chunk);
+        buffer += chunk_size;
+    }
+    total += count_bits_naive(buffer, leftover);
     return total;
 }
 
-inline long count_bits_sse(uchar *buffer, size_t bufsize)
+long count_bits_intrinsic(const uchar *buffer, size_t bufsize)
+{
+    const size_t iterations = bufsize / chunk_size;
+    const int leftover = bufsize - iterations * chunk_size;
+    long total = 0;
+    for (size_t i = 0; i < iterations; i++)
+    {
+        chunk_t chunk = *reinterpret_cast<chunk_t *>(buffer);
+        total += __builtin_popcountl(chunk);
+        buffer += chunk_size;
+    }
+    total += count_bits_naive(buffer, leftover);
+    return total;
+}
+
+long count_bits_fast(const uchar *buffer, size_t bufsize)
+{
+    const size_t aligned_size = (bufsize / chunk_size) * chunk_size;
+    long bitcount = count_bits_sse(buffer, bufsize);
+    bitcount += count_bits_naive(buffer + aligned_size, bufsize - aligned_size);
+    return bitcount;
+}
+
+inline long count_bits_sse(const uchar *buffer, size_t bufsize)
 {
     size_t iterations = bufsize / chunk_size;
     if (!iterations)
@@ -70,22 +116,29 @@ inline long count_bits_sse(uchar *buffer, size_t bufsize)
     return total;
 }
 
-long count_bits_fast(uchar *buffer, size_t bufsize)
+void time_bit_counting(bit_counting_function *func, int iters, const uchar *buffer, size_t bufsize)
 {
-    const size_t aligned_size = (bufsize / chunk_size) * chunk_size;
-    long bitcount = count_bits_sse(buffer, bufsize);
-    bitcount += count_bits_naive(buffer + aligned_size, bufsize - aligned_size);
-    return bitcount;
-}
+    time_t start, duration;
+    // How many iterations represent roughly 10% of the total.
+    // Used because We print a dot after every 10%.
+    int ten_percent = iters / 10;
+    if (ten_percent < 10)
+        //  Just print a dot after every one
+        ten_percent = 1;
 
-long count_bits_naive(uchar *buffer, size_t bufsize)
-{
-    long bitcount = 0;
-    for(size_t byte = 0; byte < bufsize; byte++)
-        for(int bit = 0; bit < 8; bit++)
-            if (buffer[byte] & (1 << bit))
-                bitcount++;
-    return bitcount;
+    start = time(NULL);
+    for (int i = 0; i < iters; i++)
+    {
+        long num_bits = func(buffer, bufsize);
+        if (i == 0)
+            printf("%ld bits are set", num_bits);
+        else if (! (i % ten_percent))
+            printf(".");
+        fflush(stdout);
+    }
+    duration = time(NULL) - start;
+    printf("\n");
+    printf("%f seconds per iteration\n", ((double)duration / iters));
 }
 
 int main(int argc, char **argv)
@@ -112,38 +165,12 @@ int main(int argc, char **argv)
     buffer += 1;
     bufsize -= 1;
 
-    int iters;
-    time_t start, duration;
-
     printf("Timing naive implementation\n");
-    start = time(NULL);
-    iters = 3;
-    for (int i =0; i < iters; i++)
-    {
-        long num_bits = count_bits_naive(buffer, bufsize);
-        if (i == 0)
-            printf("%ld bits are set", num_bits);
-        else
-            printf(".");
-        fflush(stdout);
-    }
-    duration = time(NULL) - start;
-    printf("\n");
-    printf("naive: %f seconds per iteration\n", ((double)duration / iters));
-
+    time_bit_counting(count_bits_naive, 10, buffer, bufsize);
+    printf("Timing intrinsic implementation\n");
+    time_bit_counting(count_bits_intrinsic, 100, buffer, bufsize);
     printf("Timing badass implementation\n");
-    start = time(NULL);
-    iters = 100000;
-    for (int i =0; i < iters; i++)
-    {
-        long num_bits = count_bits_fast(buffer, bufsize);
-        if (i == 0)
-            printf("%ld bits are set", num_bits);
-        else if (! (i % 1000))
-            printf(".");
-        fflush(stdout);
-    }
-    duration = time(NULL) - start;
-    printf("\n");
-    printf("SSE: %f seconds per iteration\n", ((double)duration / iters));
+    time_bit_counting(count_bits_fast, 1000, buffer, bufsize);
+
+    return 0;
 }
