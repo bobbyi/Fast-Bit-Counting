@@ -1,12 +1,17 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
 
-int count_bits_buffer(void *buffer, size_t bufsize);
+
+
+int count_bits_loop(void *buffer, size_t bufsize);
+int count_bits_aligned(void *buffer, size_t bufsize);
+int count_bits_naive(void *buffer, size_t bufsize);
 inline int count_bits_sse(unsigned int the_int);
-inline int count_bits(unsigned int the_int);
 
 // assumes 0 == bufsize % sizeof(unsigned)
-int count_bits_buffer(void *buffer, size_t bufsize)
+int count_bits_aligned(void *buffer, size_t bufsize)
 {
     int bitcount = 0;
     int total = 0;
@@ -27,17 +32,12 @@ int count_bits_buffer(void *buffer, size_t bufsize)
     return total;
 }
 
-int count_bits_buffer_loop(void *buffer, size_t bufsize)
+int count_bits_loop(void *buffer, size_t bufsize)
 {
+    int bitcount = count_bits_aligned(buffer, bufsize);
     const size_t num_ints = bufsize / sizeof(int);
     const size_t num_chars= bufsize % sizeof(int);
-    unsigned int *the_int = static_cast<unsigned int *>(buffer);
-    int bitcount = 0;
-    for (size_t which_int = 0; which_int < num_ints; which_int++)
-    {
-        bitcount += count_bits_sse(*the_int++);
-    }
-    unsigned char *the_char = reinterpret_cast<unsigned char *>(the_int);
+    unsigned char *the_char = static_cast<unsigned char *>(buffer) + num_ints * sizeof(int);
     for (size_t which_char = 0; which_char < num_chars; which_char++)
     {
         bitcount += count_bits_sse(*the_char++);
@@ -58,48 +58,33 @@ inline int count_bits_sse(unsigned int the_int)
     return bitcount;
 }
 
-inline int count_bits(unsigned int the_int)
+int count_bits_naive(void *buffer, size_t bufsize)
 {
     int bitcount = 0;
-    for(int bit = 0; bit < sizeof(the_int) * 8; bit++)
-    {
-        int bit_is_set;
-        __asm__ ( 
-            "bt %1, (%2);"
-            "setc %b0;"
-
-            : "=g" (bit_is_set)
-            :  "r" (bit), "r" (&the_int)
-            : "cc"
-        );
-        bitcount += bit_is_set;
-    }
+    unsigned char *bytes = static_cast<unsigned char*>(buffer);
+    for(int byte = 0; byte < bufsize; byte++)
+        for(int bit = 0; bit < 8; bit++)
+            if (bytes[byte] & (1 << bit))
+                bitcount++;
     return bitcount;
 }
 
-int main(int argv, char **argc)
+int main(int argc, char **argv)
 {
-    unsigned int my = 0;
-    for(int bit = 0; bit < sizeof(my) * 8; bit++)
-    {
-        if (bit == 2) continue;
-        if (bit == 12) continue;
-        unsigned int theval = (1 << bit);
-        my |= theval;
-    }
+    char *filename = argc > 1 ? argv[1] : argv[0];
+    struct stat filestatus;
+    stat( filename, &filestatus );
 
-    printf("%d\n", count_bits_sse(my));
-
-    unsigned int ints[3];
-    ints[0] = my;
-    ints[1] = 0;
-    ints[2] = my;
-    const size_t bufsize = sizeof(ints) + 2;
+    const size_t bufsize = filestatus.st_size;
     unsigned char *buffer = new unsigned char[bufsize];
-    memcpy(buffer, ints, sizeof(ints));
-    buffer[bufsize - 1] = 1;
-    buffer[bufsize - 2] = 3;
-    printf("%d\n", count_bits_buffer(buffer, 2+sizeof(ints)));
-    printf("%d\n", count_bits_buffer_loop(buffer, 2+sizeof(ints)));
+
+    FILE *infile = fopen(filename, "r");
+    fread(buffer, 1, bufsize, infile);
+    fclose(infile);
+
+    for(int i = 0; i < 100; i++) {
+         count_bits_loop(buffer, bufsize);
+         //count_bits_naive(buffer, bufsize);
+    }
     return 0;
 }
