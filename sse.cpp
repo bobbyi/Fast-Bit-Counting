@@ -40,7 +40,7 @@ int count_bits_buffer_loop(void *buffer, size_t bufsize)
     unsigned char *the_char = reinterpret_cast<unsigned char *>(the_int);
     for (size_t which_char = 0; which_char < num_chars; which_char++)
     {
-        bitcount += count_bits_sse(*the_int++);
+        bitcount += count_bits_sse(*the_char++);
     }
     return bitcount;
 }
@@ -94,11 +94,12 @@ int main(int argv, char **argc)
     ints[0] = my;
     ints[1] = 0;
     ints[2] = my;
-    const size_t bufsize = sizeof(ints) + 1;
+    const size_t bufsize = sizeof(ints) + 2;
     unsigned char *buffer = new unsigned char[bufsize];
     memcpy(buffer, ints, sizeof(ints));
     buffer[bufsize - 1] = 1;
-    printf("%d\n", count_bits_buffer(buffer, 1+sizeof(ints)));
-    printf("%d\n", count_bits_buffer_loop(buffer, 1+sizeof(ints)));
+    buffer[bufsize - 2] = 3;
+    printf("%d\n", count_bits_buffer(buffer, 2+sizeof(ints)));
+    printf("%d\n", count_bits_buffer_loop(buffer, 2+sizeof(ints)));
     return 0;
 }
