@@ -3,27 +3,55 @@
 #include <string.h>
 #include <time.h>
 
+// We loop through one unsigned long at a time
+typedef unsigned long chunk_t;
+const static int chunk_size = sizeof(chunk_t);
+
 long count_bits_fast(unsigned char *buffer, size_t bufsize);
 long count_bits_naive(unsigned char *buffer, size_t bufsize);
 // helper for count_bits_fast
 inline long count_bits_sse(unsigned char *buffer, size_t bufsize);
 
-inline long count_bits_sse(unsigned char *buffer, size_t bufsize)
+inline long count_bits_intrinsic(unsigned char *buffer, size_t bufsize)
 {
-    const int iterations = bufsize / sizeof(unsigned long);
+    const int iterations = bufsize / chunk_size;
     if (!iterations)
         return 0;
     long bitcount = 0;
     long total;
-    int ecx;
+    for (size_t i =0; i < iterations; i ++)
+        ;
+    return total;
+}
+
+inline long count_bits_sse(unsigned char *buffer, size_t bufsize)
+{
+    const size_t iterations = bufsize / chunk_size;
+    if (!iterations)
+        return 0;
+    // We clobber ecx, but gcc won't let us declare ecx as clobbered.
+    // so instead we declare it as output into this dummy output variable.
+    int ecx; 
+    // This is a dummy output variable for the bitcount
+    // calculated in each iteration.
+    // Which is really a temporary register that we are clobbering.
+    long bitcount;
+    // The actual output variable.
+    long total;
+
     __asm__ (
+        // do {
         "1:"
+        //     bitcount = popcnt(*buffer);
         "popcnt (%1), %0;"
+        //     total += bitcount;
         "add %0, %3;"
+        //     buffer += chunk_size;
         "add %5, %1;"
+        // } while(--total);
         "loop 1b;"
         : "=&r" (bitcount), "=&r" (buffer), "=&c" (ecx), "=&r" (total)
-        : "1" (buffer), "i" (sizeof(unsigned long)), "2" (iterations), "3" (total)
+        : "1" (buffer), "i" (chunk_size), "2" (iterations), "3" (total)
         : "cc"
     );
     return total;
@@ -31,7 +59,7 @@ inline long count_bits_sse(unsigned char *buffer, size_t bufsize)
 
 long count_bits_fast(unsigned char *buffer, size_t bufsize)
 {
-    const size_t aligned_size = (bufsize / sizeof(unsigned long)) * sizeof(unsigned long);
+    const size_t aligned_size = (bufsize / chunk_size) * chunk_size;
     long bitcount = count_bits_sse(buffer, bufsize);
     bitcount += count_bits_naive(buffer + aligned_size, bufsize - aligned_size);
     return bitcount;
@@ -50,7 +78,14 @@ long count_bits_naive(unsigned char *buffer, size_t bufsize)
 int main(int argc, char **argv)
 {
     const char *filename = "/dev/urandom";
-    size_t bufsize = 2000000000; 
+    size_t megs_of_data = 100; 
+    if (argc > 1)
+    {
+        megs_of_data = atol(argv[1]);
+    }
+    printf("Using %d megs of data\n", megs_of_data);
+
+    size_t bufsize = megs_of_data * 1024 * 1024;
     unsigned char *buffer = new unsigned char[bufsize];
 
     printf("Reading input...\n");
@@ -79,23 +114,23 @@ int main(int argc, char **argv)
             printf(".");
         fflush(stdout);
     }
-    printf("\n");
     duration = time(NULL) - start;
+    printf("\n");
     printf("naive: %f seconds per iteration\n", ((double)duration / iters));
 
     printf("Timing badass implementation\n");
     start = time(NULL);
-    iters = 10000;
+    iters = 100000;
     for (int i =0; i < iters; i++)
     {
         long num_bits = count_bits_fast(buffer, bufsize);
         if (i == 0)
             printf("%ld bits are set", num_bits);
-        else if (! (i % 100))
+        else if (! (i % 1000))
             printf(".");
         fflush(stdout);
     }
-    printf("\n");
     duration = time(NULL) - start;
+    printf("\n");
     printf("SSE: %f seconds per iteration\n", ((double)duration / iters));
 }
