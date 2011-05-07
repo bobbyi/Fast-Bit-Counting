@@ -4,23 +4,30 @@
 
 typedef unsigned char uchar;
 
-// We loop through one unsigned long at a time
-typedef const unsigned long chunk_t;
-const static int chunk_size = sizeof(chunk_t);
-
-// Define what a bit counting function looks like
+// A bit counting function is a function that takes a buffer
+// and returns a count of the number of bits set.
 typedef long bit_counting_function(const uchar *buffer, size_t bufsize);
 
 // The various implementations of bit counting functions
 bit_counting_function count_bits_naive;
 bit_counting_function count_bits_fast;
 bit_counting_function count_bits_intrinsic;
-// helper for count_bits_fast
+
+// Helper functions for implementations
+long count_bits_chunked(bit_counting_function *chunked_func, const uchar *buffer, size_t bufsize);
+bit_counting_function count_bits_intrinsic_chunked;
 bit_counting_function count_bits_sse;
+
+// The helpers rely on working in chunks
+typedef const unsigned long chunk_t;
+const static int chunk_size = sizeof(chunk_t);
 
 // Timer
 void time_bit_counting(bit_counting_function *func, int iters, const uchar *buffer, size_t bufsize);
 
+
+
+// Iterate through the buffer one bit at a time
 long count_bits_naive(const uchar *buffer, size_t bufsize)
 {
     long bitcount = 0;
@@ -31,24 +38,21 @@ long count_bits_naive(const uchar *buffer, size_t bufsize)
     return bitcount;
 }
 
-long count_bits_chunked(bit_counting_function *func, const uchar *buffer, size_t bufsize)
+// Given a bit counting function that only works on buffers who divide evenly by chunk_size,
+// count the bits for an arbitrary buffer by using the chunked_func on as much of the buffer
+// as divides into chunks and then the naive bit-by-bit algorith on whatever is left over
+inline long count_bits_chunked(bit_counting_function *chunked_func, const uchar *buffer, size_t bufsize)
 {
     const size_t num_chunks = bufsize / chunk_size;
     const size_t chunked_bufsize = num_chunks * chunk_size;
     const size_t leftover = bufsize - chunked_bufsize;
-    const int leftover = bufsize - iterations * chunk_size;
-    long total = func(buffer, bufsize -;
-    for (size_t i = 0; i < iterations; i++)
-    {
-        chunk_t chunk = *reinterpret_cast<chunk_t *>(buffer);
-        total += __builtin_popcountl(chunk);
-        buffer += chunk_size;
-    }
-    total += count_bits_naive(buffer, leftover);
-    return total;
+
+    return chunked_func(buffer, chunked_bufsize) + 
+           count_bits_naive(buffer + chunked_bufsize, leftover);
 }
 
-long count_bits_intrinsic(const uchar *buffer, size_t bufsize)
+// Count the bits in a buffer that is divisible by chunk_size using SSE instrinsics
+long count_bits_intrinsic_chunked(const uchar *buffer, size_t bufsize)
 {
     const size_t iterations = bufsize / chunk_size;
     const int leftover = bufsize - iterations * chunk_size;
@@ -59,18 +63,16 @@ long count_bits_intrinsic(const uchar *buffer, size_t bufsize)
         total += __builtin_popcountl(chunk);
         buffer += chunk_size;
     }
-    total += count_bits_naive(buffer, leftover);
     return total;
 }
 
-long count_bits_fast(const uchar *buffer, size_t bufsize)
+// Count the bits in an arbitrary sized buffer using SSE instrinsics
+long count_bits_intrinsic(const uchar *buffer, size_t bufsize)
 {
-    const size_t aligned_size = (bufsize / chunk_size) * chunk_size;
-    long bitcount = count_bits_sse(buffer, bufsize);
-    bitcount += count_bits_naive(buffer + aligned_size, bufsize - aligned_size);
-    return bitcount;
+    return count_bits_chunked(count_bits_intrinsic_chunked, buffer, bufsize);
 }
 
+// Count the bits in a buffer that is divisible by chunk_size using SSE ASM
 inline long count_bits_sse(const uchar *buffer, size_t bufsize)
 {
     size_t iterations = bufsize / chunk_size;
@@ -116,6 +118,13 @@ inline long count_bits_sse(const uchar *buffer, size_t bufsize)
     return total;
 }
 
+// Count the bits in an arbitrary sized buffer using SSE ASM
+long count_bits_fast(const uchar *buffer, size_t bufsize)
+{
+    return count_bits_chunked(count_bits_sse, buffer, bufsize);
+}
+
+// Time how fast a bit counting function is
 void time_bit_counting(bit_counting_function *func, int iters, const uchar *buffer, size_t bufsize)
 {
     time_t start, duration;
