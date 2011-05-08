@@ -4,8 +4,7 @@
 #include <omp.h>
 
 const int naive_iters = 10;
-const int intrinsic_iters = 100;
-const int fast_iters = 500;
+const int fast_iters = 100;
 
 typedef unsigned char uchar;
 
@@ -139,7 +138,7 @@ inline long count_bits_fast_chunked(const uchar *buffer, size_t bufsize)
 }
 
 // Time how fast a bit counting function is
-void time_bit_counting(bit_counting_function *func, int iters, const uchar *buffer, size_t bufsize, const char *description)
+void time_bit_counting(const char *description, bit_counting_function *func, const uchar *buffer, size_t bufsize, int iters = fast_iters)
 {
     time_t start, duration;
     // How many iterations represent roughly 10% of the total.
@@ -191,14 +190,20 @@ int main(int argc, char **argv)
     buffer += 1;
     bufsize -= 1;
 
-    time_bit_counting(count_bits_naive, naive_iters, buffer, bufsize, "naive implementation");
-    time_bit_counting(count_bits_intrinsic, intrinsic_iters, buffer, bufsize, "intrinsic implementation (parallel)");
-    time_bit_counting(count_bits_fast, fast_iters, buffer, bufsize, "asm implementation (parallel)");
+    time_bit_counting("naive implementation",
+                      count_bits_naive, buffer, bufsize, naive_iters);
+    time_bit_counting("intrinsic implementation (parallel)",
+                      count_bits_intrinsic, buffer, bufsize);
+    time_bit_counting("asm implementation (parallel)",
+                      count_bits_fast, buffer, bufsize);
 
+    // Turn off parallelism
     omp_set_num_threads(1);
 
-    time_bit_counting(count_bits_intrinsic, intrinsic_iters, buffer, bufsize, "intrinsic implementation (serial)");
-    time_bit_counting(count_bits_fast, fast_iters, buffer, bufsize, "asm implementation (serial)");
+    time_bit_counting("intrinsic implementation (serial)",
+                      count_bits_intrinsic, buffer, bufsize);
+    time_bit_counting("asm implementation (serial)",
+                      count_bits_fast, buffer, bufsize);
 
     delete [] original_buffer;
     return 0;
