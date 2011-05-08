@@ -173,7 +173,7 @@ void time_bit_counting(const char *description, bit_counting_function *func, con
             cout << ".";
     }
     const time_t duration = time(NULL) - start;
-    cout << endl << ((double)duration / iters) << " seconds per iteration\n";
+    cout << endl << ((double)duration / iters) << " seconds per iteration" << endl;
 }
 
 int main(int argc, char **argv)
@@ -207,7 +207,7 @@ int main(int argc, char **argv)
     ifstream infile("/dev/urandom", ios::binary);
     cout << "Reading input..." << endl;
     infile.read(reinterpret_cast<char*>(buffer), bufsize);
-    cout << "done reading input\n" << endl;
+    cout << "done reading input" << endl << endl;
     infile.close();
 
     time_bit_counting("naive implementation",
