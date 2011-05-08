@@ -149,7 +149,6 @@ void time_bit_counting(const char *description, bit_counting_function *func, con
         ten_percent = 1;
 
     printf("Timing %s ", description);
-    fflush(stdout);
     start = time(NULL);
     for (int i = 0; i < iters; i++)
     {
@@ -158,7 +157,6 @@ void time_bit_counting(const char *description, bit_counting_function *func, con
             printf("(%ld bits are set) ", num_bits);
         else if (! (i % ten_percent))
             printf(".");
-        fflush(stdout);
     }
     duration = time(NULL) - start;
     printf("\n");
@@ -167,6 +165,9 @@ void time_bit_counting(const char *description, bit_counting_function *func, con
 
 int main(int argc, char **argv)
 {
+    // Unbuffered stdout
+    setvbuf(stdout,NULL,_IONBF,0);
+
     const char *filename = "/dev/urandom";
     size_t megs_of_data = 100; 
     if (argc > 1)
