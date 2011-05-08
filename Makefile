@@ -1,13 +1,14 @@
 CC=g++
 CFLAGS=-Wall -Werror -O3 -fopenmp -lgomp
+EXECUTABLE=./count_bits
 
-count_bits: sse.cpp
+$(EXECUTABLE): sse.cpp
 	$(CC) $(CFLAGS) $< -o $@
 
-test: count_bits
-	./count_bits 20
+test: $(EXECUTABLE)
+	$(EXECUTABLE) 20
 
 clean:
-	rm -f count_bits core*
+	rm -f $(EXECUTABLE) core*
 
 .PHONY: clean test

@@ -3,6 +3,11 @@
 #include <time.h>
 #include <omp.h>
 
+#include <iostream>
+#include <fstream>
+
+using namespace std;
+
 typedef unsigned char uchar;
 
 // A bit counting function is a function that takes a buffer
@@ -159,19 +164,18 @@ void time_bit_counting(const char *description, bit_counting_function *func, con
         //  Just print a dot after every one
         ten_percent = 1;
 
-    printf("Timing %s ", description);
+    cout << "Timing " << description;
     const time_t start = time(NULL);
     for (int i = 0; i < iters; i++)
     {
         long num_bits = func(buffer, bufsize);
         if (i == 0)
-            printf("(%ld bits are set) ", num_bits);
+            cout << " (" << num_bits << " bits are set) " << endl;
         else if (! (i % ten_percent))
-            printf(".");
+            cout << ".";
     }
     const time_t duration = time(NULL) - start;
-    printf("\n");
-    printf("%f seconds per iteration\n", ((double)duration / iters));
+    cout << endl << ((double)duration / iters) << " seconds per iteration\n";
 }
 
 int main(int argc, char **argv)
@@ -185,7 +189,7 @@ int main(int argc, char **argv)
     {
         megs_of_data = atol(argv[1]);
     }
-    printf("Using %d megs of data\n", megs_of_data);
+    cout << "Using " << megs_of_data << " megs of data" << endl;
     size_t bufsize = megs_of_data * 1024 * 1024;
     uchar *buffer = new unsigned char[bufsize];
 
@@ -197,12 +201,11 @@ int main(int argc, char **argv)
 
     // Use /dev/urandom intead of /dev/random because
     // the latter may block if we try to read too much
-    const char *filename = "/dev/urandom";
-    printf("Reading input...\n");
-    FILE *infile = fopen(filename, "r");
-    fread(buffer, 1, bufsize, infile);
-    fclose(infile);
-    printf("done reading input\n");
+    ifstream infile("/dev/urandom", ios::binary);
+    cout << "Reading input..." << endl;
+    infile.read(reinterpret_cast<char*>(buffer), bufsize);
+    cout << "done reading input\n" << endl;
+    infile.close();
 
     time_bit_counting("naive implementation",
                       count_bits_naive, buffer, bufsize, naive_iters);
