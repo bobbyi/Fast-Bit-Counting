@@ -1,6 +1,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
+#include <omp.h>
+
+const int naive_iters = 10;
+const int fast_iters = 100;
+const int intrinsic_iters = 500;
 
 typedef unsigned char uchar;
 
@@ -22,10 +27,6 @@ bit_counting_function count_bits_fast_chunked;
 typedef const unsigned long chunk_t;
 const static int chunk_size = sizeof(chunk_t);
 
-// Timer
-void time_bit_counting(bit_counting_function *func, int iters, const uchar *buffer, size_t bufsize);
-
-
 
 // Iterate through the buffer one bit at a time
 long count_bits_naive(const uchar *buffer, size_t bufsize)
@@ -38,17 +39,44 @@ long count_bits_naive(const uchar *buffer, size_t bufsize)
     return bitcount;
 }
 
+int num_threads()
+{
+    int n_threads;
+#pragma omp parallel shared(n_threads)
+    {
+#pragma omp master
+        {
+            n_threads = omp_get_num_threads();
+        }
+    }
+    return n_threads > 0 ? n_threads : -1;
+}
+
 // Given a bit counting function that only works on buffers who divide evenly by chunk_size,
 // count the bits for an arbitrary buffer by using the chunked_func on as much of the buffer
 // as divides into chunks and then the naive bit-by-bit algorith on whatever is left over
 inline long count_bits_chunked(bit_counting_function *chunked_func, const uchar *buffer, size_t bufsize)
 {
+    const int num_cores = num_threads();
     const size_t num_chunks = bufsize / chunk_size;
-    const size_t chunked_bufsize = num_chunks * chunk_size;
+    const size_t chunks_per_core = num_chunks / num_cores;
+    const size_t bufsize_per_core = chunks_per_core * chunk_size;
+    const size_t chunked_bufsize = num_cores * bufsize_per_core;
     const size_t leftover = bufsize - chunked_bufsize;
 
-    return chunked_func(buffer, chunked_bufsize) + 
-           count_bits_naive(buffer + chunked_bufsize, leftover);
+    long total = 0;
+
+#pragma omp parallel for reduction (+:total)
+    for (int core = 0; core < num_cores; core++)
+    {
+        const uchar *mybuffer= buffer + core * bufsize_per_core;
+        const long num_bits = chunked_func(mybuffer, bufsize_per_core);
+        total += num_bits;
+    }
+
+    total += count_bits_naive(buffer + chunked_bufsize, leftover);
+
+    return total;
 }
 
 // Count the bits in a buffer that is divisible by chunk_size using SSE instrinsics
@@ -125,7 +153,7 @@ long count_bits_fast(const uchar *buffer, size_t bufsize)
 }
 
 // Time how fast a bit counting function is
-void time_bit_counting(bit_counting_function *func, int iters, const uchar *buffer, size_t bufsize)
+void time_bit_counting(bit_counting_function *func, int iters, const uchar *buffer, size_t bufsize, const char *description)
 {
     time_t start, duration;
     // How many iterations represent roughly 10% of the total.
@@ -135,12 +163,14 @@ void time_bit_counting(bit_counting_function *func, int iters, const uchar *buff
         //  Just print a dot after every one
         ten_percent = 1;
 
+    printf("Timing %s ", description);
+    fflush(stdout);
     start = time(NULL);
     for (int i = 0; i < iters; i++)
     {
         long num_bits = func(buffer, bufsize);
         if (i == 0)
-            printf("%ld bits are set", num_bits);
+            printf("(%ld bits are set) ", num_bits);
         else if (! (i % ten_percent))
             printf(".");
         fflush(stdout);
@@ -175,12 +205,14 @@ int main(int argc, char **argv)
     buffer += 1;
     bufsize -= 1;
 
-    printf("Timing naive implementation\n");
-    time_bit_counting(count_bits_naive, 10, buffer, bufsize);
-    printf("Timing intrinsic implementation\n");
-    time_bit_counting(count_bits_intrinsic, 100, buffer, bufsize);
-    printf("Timing badass implementation\n");
-    time_bit_counting(count_bits_fast, 1000, buffer, bufsize);
+    time_bit_counting(count_bits_naive, naive_iters, buffer, bufsize, "naive implementation");
+    time_bit_counting(count_bits_intrinsic, intrinsic_iters, buffer, bufsize, "intrinsic implementation (parallel)");
+    time_bit_counting(count_bits_fast, fast_iters, buffer, bufsize, "asm implementation (parallel)");
+
+    omp_set_num_threads(1);
+
+    time_bit_counting(count_bits_intrinsic, intrinsic_iters, buffer, bufsize, "intrinsic implementation (serial)");
+    time_bit_counting(count_bits_fast, fast_iters, buffer, bufsize, "asm implementation (serial)");
 
     delete [] original_buffer;
     return 0;
