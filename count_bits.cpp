@@ -204,9 +204,9 @@ int main(int argc, char **argv)
     // Use /dev/urandom intead of /dev/random because
     // the latter may block if we try to read too much
     ifstream infile("/dev/urandom", ios::binary);
-    cout << "Reading input..." << endl;
+    cout << "Reading input... ";
     infile.read(reinterpret_cast<char*>(buffer), bufsize);
-    cout << "done reading input" << endl << endl;
+    cout << "done." << endl;
     infile.close();
 
     time_bit_counting("Naive implementation",
