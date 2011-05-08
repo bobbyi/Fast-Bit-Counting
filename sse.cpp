@@ -43,7 +43,7 @@ long count_bits_naive(const uchar *buffer, size_t bufsize)
 // Count the bits using SSE instrinsics
 long count_bits_intrinsic(const uchar *buffer, size_t bufsize)
 {
-    const size_t num_chunks = bufsize / chunk_size;
+    const long num_chunks = bufsize / chunk_size;
     const size_t chunked_bufsize = num_chunks * chunk_size;
     const int leftover = bufsize - chunked_bufsize;
     long total = 0;
@@ -53,7 +53,7 @@ long count_bits_intrinsic(const uchar *buffer, size_t bufsize)
         long thread_total = 0;
 
 #pragma omp for
-        for (size_t i = 0; i < num_chunks; i++)
+        for (long i = 0; i < num_chunks; i++)
         {
             chunk_t chunk = *reinterpret_cast<chunk_t *>(buffer + i * chunk_size);
             thread_total += __builtin_popcountl(chunk);
