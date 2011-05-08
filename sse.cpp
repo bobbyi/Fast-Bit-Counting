@@ -171,6 +171,7 @@ int main(int argc, char **argv)
 
     // Let's make the data unaligned so it's even harder for SSE
     // who sometimes cares about such things
+    uchar *original_buffer = buffer;
     buffer += 1;
     bufsize -= 1;
 
@@ -181,6 +182,6 @@ int main(int argc, char **argv)
     printf("Timing badass implementation\n");
     time_bit_counting(count_bits_fast, 1000, buffer, bufsize);
 
-    delete [] buffer;
+    delete [] original_buffer;
     return 0;
 }
