@@ -1,1 +1,23 @@
-Counting the bits set to 1 in C++ using SSE, inline ASM and other methods (with benchmarks)
+﻿"Population count" is the problem of counting how many bits in a number are set to 1.
+
+There are various bit-twiddling algorithmic approaches to this problem, but these are hopefully obsolete now that POPCNT is implemented in the instruction sets of Intel, starting with Nehalem, and AMD, starting with Barcelona.
+
+This project contains a naive C++ implementation of population count using direct bit manipulation, a version using POPCNT via the gcc intrinsic __builtin_popcountl and a version where POPCNT and the surrounding loop are inlined in assembly.
+
+For the intrinsic and ASM implementation, OpenMP is used to divide the work amongst all cores.
+
+The main program benchmarks the simple, intrinsic and ASM implementations using data from /dev/urandom.
+
+To build the program and run it with a small amount of data:
+make && make test
+
+If all implementations run and report the same number of bits set, then everything is working. If your processor doesn't support the POPCNT instruction (e.g., you have a Core 2 Duo), then the program with crash. On linux, you can verify ahead of time whether it will work by checking for 'popcnt' in the Flags section of /proc/cpuinfo 
+
+You can then benchmark the implementations with a larger amount of data with:
+./count_bits <mem>
+where mem it the amount of data to use, in megabytes (e.g., 1000 for a gig of data). Larger amounts will take a while to startup as /dev/urandom needs to get you that much random data. You can watch the physical memory used by the process grow (e.g., using top) until it reaches your requested amount.
+
+The text file results.txt has benchmark results on an EC2 c1.xlarge instance.
+
+Here is a reddit discussion of the popcnt problem from a few years back:
+http://www.reddit.com/r/programming/comments/22p5v/popcount_the_nsa_instruction_missing_from_modern/
