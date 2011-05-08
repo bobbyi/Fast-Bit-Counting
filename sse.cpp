@@ -161,7 +161,7 @@ void time_bit_counting(const char *description, bit_counting_function *func, con
         //  Just print a dot after every one
         ten_percent = 1;
 
-    cout << "Timing " << description;
+    cout << description;
     const time_t start = time(NULL);
     for (int i = 0; i < iters; i++)
     {
@@ -209,20 +209,28 @@ int main(int argc, char **argv)
     cout << "done reading input" << endl << endl;
     infile.close();
 
-    time_bit_counting("naive implementation",
+    time_bit_counting("Naive implementation",
                       count_bits_naive, buffer, bufsize, naive_iters);
-    time_bit_counting("intrinsic implementation (parallel)",
-                      count_bits_intrinsic, buffer, bufsize);
-    time_bit_counting("asm implementation (parallel)",
-                      count_bits_fast, buffer, bufsize);
 
     // Turn off parallelism
+    int original_n_threads = num_threads();
     omp_set_num_threads(1);
 
-    time_bit_counting("intrinsic implementation (serial)",
+    time_bit_counting("Intrinsic implementation (serial)",
                       count_bits_intrinsic, buffer, bufsize);
-    time_bit_counting("asm implementation (serial)",
+    time_bit_counting("ASM implementation (serial)",
                       count_bits_fast, buffer, bufsize);
+
+    if (original_n_threads > 1)
+    {
+        // Turn on parallelism
+        omp_set_num_threads(original_n_threads);
+
+        time_bit_counting("Intrinsic implementation (parallel)",
+                          count_bits_intrinsic, buffer, bufsize);
+        time_bit_counting("ASM implementation (parallel)",
+                          count_bits_fast, buffer, bufsize);
+    }
 
     delete [] original_buffer;
     return 0;
