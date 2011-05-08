@@ -1,10 +1,13 @@
+CC=g++
+CFLAGS=-Wall -Werror -O3 -fopenmp -lgomp
+
 count_bits: sse.cpp
-	g++ -O3 -fopenmp -lgomp $< -o $@
+	$(CC) $(CFLAGS) $< -o $@
 
 test: count_bits
 	./count_bits 20
 
 clean:
-	rm -f count_bits core
+	rm -f count_bits core*
 
 .PHONY: clean test
