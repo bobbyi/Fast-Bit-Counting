@@ -2,7 +2,7 @@ CC=g++
 CFLAGS=-Wall -Werror -O3 -march=barcelona -fopenmp -lgomp
 EXECUTABLE=./count_bits
 
-$(EXECUTABLE): sse.cpp
+$(EXECUTABLE): count_bits.cpp
 	$(CC) $(CFLAGS) $< -o $@
 
 test: $(EXECUTABLE)

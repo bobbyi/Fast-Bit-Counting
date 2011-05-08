@@ -161,13 +161,13 @@ void time_bit_counting(const char *description, bit_counting_function *func, con
         //  Just print a dot after every one
         ten_percent = 1;
 
-    cout << description;
+    cout << endl << description;
     const time_t start = time(NULL);
     for (int i = 0; i < iters; i++)
     {
         long num_bits = func(buffer, bufsize);
         if (i == 0)
-            cout << " (" << num_bits << " bits are set) " << endl;
+            cout << " (" << num_bits << " bits are set) ";
         else if (! (i % ten_percent))
             cout << ".";
     }
