@@ -3,9 +3,6 @@
 #include <time.h>
 #include <omp.h>
 
-const int naive_iters = 10;
-const int fast_iters = 100;
-
 typedef unsigned char uchar;
 
 // A bit counting function is a function that takes a buffer
@@ -13,16 +10,21 @@ typedef unsigned char uchar;
 typedef long bit_counting_function(const uchar *buffer, size_t bufsize);
 
 // The various implementations of bit counting functions
-bit_counting_function count_bits_naive;
-bit_counting_function count_bits_fast;
-bit_counting_function count_bits_intrinsic;
+bit_counting_function count_bits_naive; // Use simple C loop
+bit_counting_function count_bits_fast; // Use SSE intrinsics
+bit_counting_function count_bits_intrinsic; // Use inline ASM with SSE
 
-// Utility function for count_bits_fast
-inline long count_bits_fast_chunked(const uchar *buffer, size_t bufsize);
+// Utility functions for count_bits_fast
+inline long count_bits_asm(const uchar *buffer, size_t bufsize);
+int num_threads();
 
 // The SEE implementations work in long-sized chunks
 typedef const unsigned long chunk_t;
 const static int chunk_size = sizeof(chunk_t);
+
+// How may trials to use for timing the slow and fast implementations
+const int naive_iters = 10;
+const int fast_iters = 100;
 
 
 // Iterate through the buffer one bit at a time
@@ -36,44 +38,7 @@ long count_bits_naive(const uchar *buffer, size_t bufsize)
     return bitcount;
 }
 
-int num_threads()
-{
-    int n_threads;
-#pragma omp parallel shared(n_threads)
-    {
-#pragma omp master
-        {
-            n_threads = omp_get_num_threads();
-        }
-    }
-    return n_threads > 0 ? n_threads : -1;
-}
-
-long count_bits_fast(const uchar *buffer, size_t bufsize)
-{
-    const int num_cores = num_threads();
-    const size_t num_chunks = bufsize / chunk_size;
-    const size_t chunks_per_core = num_chunks / num_cores;
-    const size_t bufsize_per_core = chunks_per_core * chunk_size;
-    const size_t chunked_bufsize = num_cores * bufsize_per_core;
-    const size_t leftover = bufsize - chunked_bufsize;
-
-    long total = 0;
-
-#pragma omp parallel for reduction (+:total)
-    for (int core = 0; core < num_cores; core++)
-    {
-        const uchar *mybuffer = buffer + core * bufsize_per_core;
-        const long num_bits = count_bits_fast_chunked(mybuffer, bufsize_per_core);
-        total += num_bits;
-    }
-
-    total += count_bits_naive(buffer + chunked_bufsize, leftover);
-
-    return total;
-}
-
-// Count the bits in a buffer that is divisible by chunk_size using SSE instrinsics
+// Count the bits using SSE instrinsics
 long count_bits_intrinsic(const uchar *buffer, size_t bufsize)
 {
     const size_t num_chunks = bufsize / chunk_size;
@@ -99,8 +64,33 @@ long count_bits_intrinsic(const uchar *buffer, size_t bufsize)
     return total;
 }
 
-// Count the bits in a buffer that is divisible by chunk_size using SSE ASM
-inline long count_bits_fast_chunked(const uchar *buffer, size_t bufsize)
+// Count the bits using inline ASM with SSE
+long count_bits_fast(const uchar *buffer, size_t bufsize)
+{
+    const int num_cores = num_threads();
+    const size_t num_chunks = bufsize / chunk_size;
+    const size_t chunks_per_core = num_chunks / num_cores;
+    const size_t bufsize_per_core = chunks_per_core * chunk_size;
+    const size_t chunked_bufsize = num_cores * bufsize_per_core;
+    const size_t leftover = bufsize - chunked_bufsize;
+
+    long total = 0;
+
+#pragma omp parallel for reduction (+:total)
+    for (int core = 0; core < num_cores; core++)
+    {
+        const uchar *mybuffer = buffer + core * bufsize_per_core;
+        const long num_bits = count_bits_asm(mybuffer, bufsize_per_core);
+        total += num_bits;
+    }
+
+    total += count_bits_naive(buffer + chunked_bufsize, leftover);
+
+    return total;
+}
+
+// Count the bits using inline ASM with SSE for a buffer that is divisible by chunk_size
+inline long count_bits_asm(const uchar *buffer, size_t bufsize)
 {
     size_t iterations = bufsize / chunk_size;
     if (!iterations)
@@ -144,6 +134,20 @@ inline long count_bits_fast_chunked(const uchar *buffer, size_t bufsize)
     );
     return total;
 }
+
+int num_threads()
+{
+    int n_threads;
+#pragma omp parallel
+    {
+#pragma omp master
+        {
+            n_threads = omp_get_num_threads();
+        }
+    }
+    return n_threads > 0 ? n_threads : -1;
+}
+
 
 // Time how fast a bit counting function is
 void time_bit_counting(const char *description, bit_counting_function *func, const uchar *buffer, size_t bufsize, int iters = fast_iters)
