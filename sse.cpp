@@ -1,8 +1,6 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <time.h>
 #include <omp.h>
 
+#include <cstdlib>
 #include <iostream>
 #include <fstream>
 
@@ -188,6 +186,11 @@ int main(int argc, char **argv)
     if (argc > 1)
     {
         megs_of_data = atol(argv[1]);
+    }
+    if (!megs_of_data)
+    {
+        cerr << "Usage: " << argv[0] << " <megs of data>" << endl;
+        return -1;
     }
     cout << "Using " << megs_of_data << " megs of data" << endl;
     size_t bufsize = megs_of_data * 1024 * 1024;
