@@ -1,6 +1,6 @@
 ﻿"Population count" is the problem of counting how many bits in a number are set to 1.
 
-There are various bit-twiddling algorithmic approaches to this problem, but these are hopefully obsolete now that POPCNT is implemented in the instruction sets of Intel, starting with Nehalem, and AMD, starting with Barcelona.
+There are bit-twiddling and lookup-table algorithmic approaches to this problem, but these are hopefully obsolete now that POPCNT is implemented in the instruction sets of Intel, starting with Nehalem, and AMD, starting with Barcelona.
 
 This project contains a naive C++ implementation of population count using direct bit manipulation, a version using POPCNT via the gcc intrinsic __builtin_popcountl and a version where POPCNT and the surrounding loop are inlined in assembly.
 
