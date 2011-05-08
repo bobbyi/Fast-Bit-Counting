@@ -76,18 +76,26 @@ long count_bits_fast(const uchar *buffer, size_t bufsize)
 // Count the bits in a buffer that is divisible by chunk_size using SSE instrinsics
 long count_bits_intrinsic(const uchar *buffer, size_t bufsize)
 {
-    const size_t iterations = bufsize / chunk_size;
-    const int leftover = bufsize - iterations * chunk_size;
+    const size_t num_chunks = bufsize / chunk_size;
+    const size_t chunked_bufsize = num_chunks * chunk_size;
+    const int leftover = bufsize - chunked_bufsize;
     long total = 0;
 
-#pragma omp parallel for reduction (+:total)
-    for (size_t i = 0; i < iterations; i++)
+#pragma omp parallel reduction (+:total)
     {
-        chunk_t chunk = *reinterpret_cast<chunk_t *>(buffer + i * chunk_size);
-        total += __builtin_popcountl(chunk);
+        long thread_total = 0;
+
+#pragma omp for
+        for (size_t i = 0; i < num_chunks; i++)
+        {
+            chunk_t chunk = *reinterpret_cast<chunk_t *>(buffer + i * chunk_size);
+            thread_total += __builtin_popcountl(chunk);
+        }
+
+        total += thread_total;
     }
 
-    total += count_bits_naive(buffer + iterations * chunk_size, leftover);
+    total += count_bits_naive(buffer + chunked_bufsize, leftover);
     return total;
 }
 
@@ -140,7 +148,6 @@ inline long count_bits_fast_chunked(const uchar *buffer, size_t bufsize)
 // Time how fast a bit counting function is
 void time_bit_counting(const char *description, bit_counting_function *func, const uchar *buffer, size_t bufsize, int iters = fast_iters)
 {
-    time_t start, duration;
     // How many iterations represent roughly 10% of the total.
     // Used because We print a dot after every 10%.
     int ten_percent = iters / 10;
@@ -149,7 +156,7 @@ void time_bit_counting(const char *description, bit_counting_function *func, con
         ten_percent = 1;
 
     printf("Timing %s ", description);
-    start = time(NULL);
+    const time_t start = time(NULL);
     for (int i = 0; i < iters; i++)
     {
         long num_bits = func(buffer, bufsize);
@@ -158,7 +165,7 @@ void time_bit_counting(const char *description, bit_counting_function *func, con
         else if (! (i % ten_percent))
             printf(".");
     }
-    duration = time(NULL) - start;
+    const time_t duration = time(NULL) - start;
     printf("\n");
     printf("%f seconds per iteration\n", ((double)duration / iters));
 }
@@ -166,30 +173,32 @@ void time_bit_counting(const char *description, bit_counting_function *func, con
 int main(int argc, char **argv)
 {
     // Unbuffered stdout
-    setvbuf(stdout,NULL,_IONBF,0);
+    setvbuf(stdout, NULL, _IONBF, 0);
 
-    const char *filename = "/dev/urandom";
+    // Figure out how much data we want
     size_t megs_of_data = 100; 
     if (argc > 1)
     {
         megs_of_data = atol(argv[1]);
     }
     printf("Using %d megs of data\n", megs_of_data);
-
     size_t bufsize = megs_of_data * 1024 * 1024;
     uchar *buffer = new unsigned char[bufsize];
-
-    printf("Reading input...\n");
-    FILE *infile = fopen(filename, "r");
-    fread(buffer, 1, bufsize, infile);
-    fclose(infile);
-    printf("done reading input\n");
 
     // Let's make the data unaligned so it's even harder for SSE
     // who sometimes cares about such things
     uchar *original_buffer = buffer;
     buffer += 1;
     bufsize -= 1;
+
+    // Use /dev/urandom intead of /dev/random because
+    // the latter may block if we try to read too much
+    const char *filename = "/dev/urandom";
+    printf("Reading input...\n");
+    FILE *infile = fopen(filename, "r");
+    fread(buffer, 1, bufsize, infile);
+    fclose(infile);
+    printf("done reading input\n");
 
     time_bit_counting("naive implementation",
                       count_bits_naive, buffer, bufsize, naive_iters);
