@@ -13,12 +13,12 @@ bit_counting_function count_bits_naive;
 bit_counting_function count_bits_fast;
 bit_counting_function count_bits_intrinsic;
 
-// Helper functions for implementations
+// Utility functions for the implementations
 long count_bits_chunked(bit_counting_function *chunked_func, const uchar *buffer, size_t bufsize);
 bit_counting_function count_bits_intrinsic_chunked;
-bit_counting_function count_bits_sse;
+bit_counting_function count_bits_fast_chunked;
 
-// The helpers rely on working in chunks
+// The utility functions rely on working in chunks
 typedef const unsigned long chunk_t;
 const static int chunk_size = sizeof(chunk_t);
 
@@ -73,7 +73,7 @@ long count_bits_intrinsic(const uchar *buffer, size_t bufsize)
 }
 
 // Count the bits in a buffer that is divisible by chunk_size using SSE ASM
-inline long count_bits_sse(const uchar *buffer, size_t bufsize)
+inline long count_bits_fast_chunked(const uchar *buffer, size_t bufsize)
 {
     size_t iterations = bufsize / chunk_size;
     if (!iterations)
@@ -121,7 +121,7 @@ inline long count_bits_sse(const uchar *buffer, size_t bufsize)
 // Count the bits in an arbitrary sized buffer using SSE ASM
 long count_bits_fast(const uchar *buffer, size_t bufsize)
 {
-    return count_bits_chunked(count_bits_sse, buffer, bufsize);
+    return count_bits_chunked(count_bits_fast_chunked, buffer, bufsize);
 }
 
 // Time how fast a bit counting function is
@@ -181,5 +181,6 @@ int main(int argc, char **argv)
     printf("Timing badass implementation\n");
     time_bit_counting(count_bits_fast, 1000, buffer, bufsize);
 
+    delete [] buffer;
     return 0;
 }
