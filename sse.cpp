@@ -4,8 +4,8 @@
 #include <omp.h>
 
 const int naive_iters = 10;
-const int fast_iters = 100;
-const int intrinsic_iters = 500;
+const int intrinsic_iters = 100;
+const int fast_iters = 500;
 
 typedef unsigned char uchar;
 
@@ -18,12 +18,10 @@ bit_counting_function count_bits_naive;
 bit_counting_function count_bits_fast;
 bit_counting_function count_bits_intrinsic;
 
-// Utility functions for the implementations
-long count_bits_chunked(bit_counting_function *chunked_func, const uchar *buffer, size_t bufsize);
-bit_counting_function count_bits_intrinsic_chunked;
-bit_counting_function count_bits_fast_chunked;
+// Utility function for count_bits_fast
+inline long count_bits_fast_chunked(const uchar *buffer, size_t bufsize);
 
-// The utility functions rely on working in chunks
+// The SEE implementations work in long-sized chunks
 typedef const unsigned long chunk_t;
 const static int chunk_size = sizeof(chunk_t);
 
@@ -52,10 +50,7 @@ int num_threads()
     return n_threads > 0 ? n_threads : -1;
 }
 
-// Given a bit counting function that only works on buffers who divide evenly by chunk_size,
-// count the bits for an arbitrary buffer by using the chunked_func on as much of the buffer
-// as divides into chunks and then the naive bit-by-bit algorith on whatever is left over
-inline long count_bits_chunked(bit_counting_function *chunked_func, const uchar *buffer, size_t bufsize)
+long count_bits_fast(const uchar *buffer, size_t bufsize)
 {
     const int num_cores = num_threads();
     const size_t num_chunks = bufsize / chunk_size;
@@ -69,8 +64,8 @@ inline long count_bits_chunked(bit_counting_function *chunked_func, const uchar 
 #pragma omp parallel for reduction (+:total)
     for (int core = 0; core < num_cores; core++)
     {
-        const uchar *mybuffer= buffer + core * bufsize_per_core;
-        const long num_bits = chunked_func(mybuffer, bufsize_per_core);
+        const uchar *mybuffer = buffer + core * bufsize_per_core;
+        const long num_bits = count_bits_fast_chunked(mybuffer, bufsize_per_core);
         total += num_bits;
     }
 
@@ -80,24 +75,21 @@ inline long count_bits_chunked(bit_counting_function *chunked_func, const uchar 
 }
 
 // Count the bits in a buffer that is divisible by chunk_size using SSE instrinsics
-long count_bits_intrinsic_chunked(const uchar *buffer, size_t bufsize)
+long count_bits_intrinsic(const uchar *buffer, size_t bufsize)
 {
     const size_t iterations = bufsize / chunk_size;
     const int leftover = bufsize - iterations * chunk_size;
     long total = 0;
+
+#pragma omp parallel for reduction (+:total)
     for (size_t i = 0; i < iterations; i++)
     {
-        chunk_t chunk = *reinterpret_cast<chunk_t *>(buffer);
+        chunk_t chunk = *reinterpret_cast<chunk_t *>(buffer + i * chunk_size);
         total += __builtin_popcountl(chunk);
-        buffer += chunk_size;
     }
-    return total;
-}
 
-// Count the bits in an arbitrary sized buffer using SSE instrinsics
-long count_bits_intrinsic(const uchar *buffer, size_t bufsize)
-{
-    return count_bits_chunked(count_bits_intrinsic_chunked, buffer, bufsize);
+    total += count_bits_naive(buffer + iterations * chunk_size, leftover);
+    return total;
 }
 
 // Count the bits in a buffer that is divisible by chunk_size using SSE ASM
@@ -144,12 +136,6 @@ inline long count_bits_fast_chunked(const uchar *buffer, size_t bufsize)
         :   "cc"
     );
     return total;
-}
-
-// Count the bits in an arbitrary sized buffer using SSE ASM
-long count_bits_fast(const uchar *buffer, size_t bufsize)
-{
-    return count_bits_chunked(count_bits_fast_chunked, buffer, bufsize);
 }
 
 // Time how fast a bit counting function is
