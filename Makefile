@@ -1,5 +1,5 @@
 CC=g++
-CFLAGS=-Wall -Werror -O3 -fopenmp -lgomp
+CFLAGS=-Wall -Werror -O3 -march=barcelona -fopenmp -lgomp
 EXECUTABLE=./count_bits
 
 $(EXECUTABLE): sse.cpp
