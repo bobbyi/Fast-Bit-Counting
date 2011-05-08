@@ -1,5 +1,4 @@
 #include <omp.h>
-
 #include <cstdlib>
 #include <iostream>
 #include <fstream>
@@ -18,7 +17,7 @@ bit_counting_function count_bits_fast; // Use SSE intrinsics
 bit_counting_function count_bits_intrinsic; // Use inline ASM with SSE
 
 // Utility functions for count_bits_fast
-inline long count_bits_asm(const uchar *buffer, size_t bufsize);
+long count_bits_asm(const uchar *buffer, size_t bufsize);
 int num_threads();
 
 // The SEE implementations work in long-sized chunks
@@ -173,13 +172,13 @@ void time_bit_counting(const char *description, bit_counting_function *func, con
             cout << ".";
     }
     const time_t duration = time(NULL) - start;
-    cout << endl << ((double)duration / iters) << " seconds per iteration\n";
+    cout << endl << ((double)duration / iters) << " seconds per iteration" << endl;
 }
 
 int main(int argc, char **argv)
 {
     // Unbuffered stdout
-    setvbuf(stdout, NULL, _IONBF, 0);
+    cout.setf(ios::unitbuf);
 
     // Figure out how much data we want
     size_t megs_of_data = 100; 
@@ -207,7 +206,7 @@ int main(int argc, char **argv)
     ifstream infile("/dev/urandom", ios::binary);
     cout << "Reading input..." << endl;
     infile.read(reinterpret_cast<char*>(buffer), bufsize);
-    cout << "done reading input\n" << endl;
+    cout << "done reading input" << endl << endl;
     infile.close();
 
     time_bit_counting("naive implementation",
