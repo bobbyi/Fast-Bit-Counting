@@ -13,13 +13,14 @@ typedef long bit_counting_function(const uchar *buffer, size_t bufsize);
 
 // The various implementations of bit counting functions
 bit_counting_function count_bits_naive; // Use simple C loop per bit
-bit_counting_function count_bits_table; // Use simple C loop per byte
+bit_counting_function count_bits_table; // Use simple C loop per byte, via a lookup table
 bit_counting_function count_bits_kernighan; // Brian Kernighan's method
-bit_counting_function count_bits_fast; // Use POPCNT intrinsic
-bit_counting_function count_bits_intrinsic; // Use inline ASM with POPCNT
+bit_counting_function count_bits_intrinsic; // Use POPCNT intrinsic
+bit_counting_function count_bits_asm; // Inline ASM loop with POPCNT
+
 
 // Utility functions for implementations
-long count_bits_asm(const uchar *buffer, size_t bufsize);
+long count_bits_asm_chunked(const uchar *buffer, size_t bufsize);
 void init_lookup_table();
 int num_threads();
 
@@ -134,7 +135,7 @@ long count_bits_intrinsic(const uchar *buffer, size_t bufsize)
 }
 
 // Count the bits using inline ASM with POPCNT
-long count_bits_fast(const uchar *buffer, size_t bufsize)
+long count_bits_asm(const uchar *buffer, size_t bufsize)
 {
     const int num_cores = num_threads();
     const size_t num_chunks = bufsize / chunk_size;
@@ -159,7 +160,7 @@ long count_bits_fast(const uchar *buffer, size_t bufsize)
 }
 
 // Count the bits using inline ASM with POPCNT for a buffer that is divisible by chunk_size
-inline long count_bits_asm(const uchar *buffer, size_t bufsize)
+inline long count_bits_asm_chunked(const uchar *buffer, size_t bufsize)
 {
     size_t iterations = bufsize / chunk_size;
     if (!iterations)
@@ -292,7 +293,7 @@ int main(int argc, char **argv)
     time_bit_counting("Intrinsic implementation (serial)",
                       count_bits_intrinsic, buffer, bufsize);
     time_bit_counting("ASM implementation (serial)",
-                      count_bits_fast, buffer, bufsize);
+                      count_bits_asm, buffer, bufsize);
 
     if (original_n_threads > 1)
     {
@@ -306,7 +307,7 @@ int main(int argc, char **argv)
         time_bit_counting("Intrinsic implementation (parallel)",
                           count_bits_intrinsic, buffer, bufsize);
         time_bit_counting("ASM implementation (parallel)",
-                          count_bits_fast, buffer, bufsize);
+                          count_bits_asm, buffer, bufsize);
     }
 
     delete [] original_buffer;
