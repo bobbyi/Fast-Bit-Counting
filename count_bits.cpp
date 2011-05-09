@@ -60,15 +60,6 @@ void init_lookup_table()
         lookup_table[i] = count_bits(i);
 }
 
-// Count the bits using static lookup table
-long count_bits_table(const uchar *buffer, size_t bufsize)
-{
-    long bitcount = 0;
-    for(size_t byte = 0; byte < bufsize; byte++)
-        bitcount += lookup_table[buffer[byte]];
-    return bitcount;
-}
-
 // Count the bits by interating in word-sized chunks and
 // using a kernel function that operates on words.
 // Then, get the leftover bytes using the naive one-byte-at-a-time method.
@@ -96,6 +87,21 @@ long count_bits_kernel(const uchar *buffer, size_t bufsize)
 
     total += count_bits_naive(buffer + chunked_bufsize, leftover);
     return total;
+}
+
+// Count the bits using static lookup table
+inline long table_kernel(chunk_t chunk)
+{
+    const uchar *buffer = reinterpret_cast<const uchar *>(&chunk);
+    long total = 0;
+    for(size_t byte = 0; byte < sizeof(chunk); byte++)
+        total += lookup_table[buffer[byte]];
+    return total;
+}
+
+long count_bits_table(const uchar *buffer, size_t bufsize)
+{
+    return count_bits_kernel<table_kernel>(buffer, bufsize);
 }
 
 inline long kernighan_kernel(chunk_t _chunk)
