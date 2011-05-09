@@ -12,12 +12,14 @@ typedef unsigned char uchar;
 typedef long bit_counting_function(const uchar *buffer, size_t bufsize);
 
 // The various implementations of bit counting functions
-bit_counting_function count_bits_naive; // Use simple C loop
+bit_counting_function count_bits_naive; // Use simple C loop per bit
+bit_counting_function count_bits_table; // Use simple C loop per byte
 bit_counting_function count_bits_fast; // Use SSE intrinsics
 bit_counting_function count_bits_intrinsic; // Use inline ASM with SSE
 
-// Utility functions for count_bits_fast
+// Utility functions for implementations
 long count_bits_asm(const uchar *buffer, size_t bufsize);
+void init_lookup_table();
 int num_threads();
 
 // The SEE implementations work in long-sized chunks
@@ -37,6 +39,28 @@ long count_bits_naive(const uchar *buffer, size_t bufsize)
         for(int bit = 0; bit < 8; bit++)
             if (buffer[byte] & (1 << bit))
                 bitcount++;
+    return bitcount;
+}
+
+template <class type>
+long count_bits(type number)
+{
+    return count_bits_naive(reinterpret_cast<const uchar *>(&number), sizeof(number));
+}
+
+static int lookup_table[256];
+void init_lookup_table()
+{
+    for (int i = 0; i < 256; i++)
+        lookup_table[i] = count_bits(i);
+}
+
+// Count the bits using static lookup table
+long count_bits_table(const uchar *buffer, size_t bufsize)
+{
+    long bitcount = 0;
+    for(size_t byte = 0; byte < bufsize; byte++)
+        bitcount += lookup_table[buffer[byte]];
     return bitcount;
 }
 
@@ -209,8 +233,13 @@ int main(int argc, char **argv)
     cout << "done reading input" << endl << endl;
     infile.close();
 
+    init_lookup_table();
+
     time_bit_counting("Naive implementation",
                       count_bits_naive, buffer, bufsize, naive_iters);
+
+    time_bit_counting("Lookup table implementation",
+                      count_bits_table, buffer, bufsize, naive_iters);
 
     // Turn off parallelism
     int original_n_threads = num_threads();
