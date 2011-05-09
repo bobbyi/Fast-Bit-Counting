@@ -2,16 +2,12 @@
 
 There are bit-twiddling and lookup-table algorithmic approaches to this problem, but these are hopefully obsolete now that POPCNT is implemented in the instruction sets of Intel, starting with Nehalem, and AMD, starting with Barcelona.
 
-This project contains a naive C++ implementation of population count using direct bit manipulation, a version using POPCNT via the gcc intrinsic __builtin_popcountl and a version where POPCNT and the surrounding loop are inlined in assembly.
+This project benchmarks various implementations of population count using direct bit manipulation, POPCNT via the gcc intrinsic __builtin_popcountl and POPCNT via inline assembly, each with and without using OpenMP to divide the work amongst all cores.
 
-For the intrinsic and ASM implementation, OpenMP is used to divide the work amongst all cores.
-
-The main program benchmarks the simple, intrinsic and ASM implementations using data from /dev/urandom.
-
-To build the program and run it with a small amount of data:
+The main program benchmarks the implementations using data from /dev/urandom. To build it and test it with a small amount of data:
 make && make test
 
-If all implementations run and report the same number of bits set, then everything is working. If your processor doesn't support the POPCNT instruction (e.g., you have a Core 2 Duo), then the program with crash. On linux, you can verify ahead of time whether it will work by checking for 'popcnt' in the Flags section of /proc/cpuinfo 
+If all implementations run and report the same number of bits set, then everything is working. If your processor doesn't support the POPCNT instruction (e.g., you have a Core 2 Duo), then the program with crash. On linux, you can verify ahead of time whether it will work by checking for 'popcnt' in the Flags section of /proc/cpuinfo . If it fails to compile, you probably need a newer version of gcc (4.4 or later).
 
 You can then benchmark the implementations with a larger amount of data with:
 ./count_bits <mem>
@@ -19,5 +15,6 @@ where mem it the amount of data to use, in megabytes (e.g., 1000 for a gig of da
 
 The text file results.txt has benchmark results on an EC2 c1.xlarge instance.
 
-Here is a reddit discussion of the popcnt problem from a few years back:
+More discussion on the population count problem:
 http://www.reddit.com/r/programming/comments/22p5v/popcount_the_nsa_instruction_missing_from_modern/
+http://chessprogramming.wikispaces.com/Population+Count
