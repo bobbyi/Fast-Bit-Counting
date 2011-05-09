@@ -14,8 +14,9 @@ typedef long bit_counting_function(const uchar *buffer, size_t bufsize);
 // The various implementations of bit counting functions
 bit_counting_function count_bits_naive; // Use simple C loop per bit
 bit_counting_function count_bits_table; // Use simple C loop per byte
-bit_counting_function count_bits_fast; // Use SSE intrinsics
-bit_counting_function count_bits_intrinsic; // Use inline ASM with SSE
+bit_counting_function count_bits_kernighan; // Brian Kernighan's method
+bit_counting_function count_bits_fast; // Use POPCNT intrinsic
+bit_counting_function count_bits_intrinsic; // Use inline ASM with POPCNT
 
 // Utility functions for implementations
 long count_bits_asm(const uchar *buffer, size_t bufsize);
@@ -65,7 +66,37 @@ long count_bits_table(const uchar *buffer, size_t bufsize)
     return bitcount;
 }
 
-// Count the bits using SSE instrinsics
+long count_bits_kernighan(const uchar *buffer, size_t bufsize)
+{
+    long total = 0;
+    const long num_chunks = bufsize / chunk_size;
+    const size_t chunked_bufsize = num_chunks * chunk_size;
+    const int leftover = bufsize - chunked_bufsize;
+
+#pragma omp parallel reduction (+:total)
+    {
+        long thread_total = 0;
+
+#pragma omp for
+        for (long i = 0; i < num_chunks; i++)
+        {
+            chunk_t _chunk = *reinterpret_cast<chunk_t *>(buffer + i * chunk_size);
+            long chunk = static_cast<long>(_chunk);
+            while (chunk)
+            {
+                thread_total++;
+                chunk &= chunk - 1;
+            }
+        }
+
+        total += thread_total;
+    }
+
+    total += count_bits_naive(buffer + chunked_bufsize, leftover);
+    return total;
+}
+
+// Count the bits using POPCNT instrinsic
 long count_bits_intrinsic(const uchar *buffer, size_t bufsize)
 {
     const long num_chunks = bufsize / chunk_size;
@@ -91,7 +122,7 @@ long count_bits_intrinsic(const uchar *buffer, size_t bufsize)
     return total;
 }
 
-// Count the bits using inline ASM with SSE
+// Count the bits using inline ASM with POPCNT
 long count_bits_fast(const uchar *buffer, size_t bufsize)
 {
     const int num_cores = num_threads();
@@ -116,7 +147,7 @@ long count_bits_fast(const uchar *buffer, size_t bufsize)
     return total;
 }
 
-// Count the bits using inline ASM with SSE for a buffer that is divisible by chunk_size
+// Count the bits using inline ASM with POPCNT for a buffer that is divisible by chunk_size
 inline long count_bits_asm(const uchar *buffer, size_t bufsize)
 {
     size_t iterations = bufsize / chunk_size;
@@ -241,6 +272,9 @@ int main(int argc, char **argv)
 
     time_bit_counting("Lookup table implementation",
                       count_bits_table, buffer, bufsize, naive_iters);
+
+    time_bit_counting("Brian Kernighan's method",
+                      count_bits_kernighan, buffer, bufsize, naive_iters);
 
     // Turn off parallelism
     int original_n_threads = num_threads();
