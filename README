@@ -2,7 +2,7 @@
 
 There are bit-twiddling and lookup-table algorithmic approaches to this problem, but these are hopefully obsolete now that POPCNT is implemented in the instruction sets of Intel, starting with Nehalem, and AMD, starting with Barcelona.
 
-This project benchmarks various implementations of population count using direct bit manipulation, POPCNT via the gcc intrinsic __builtin_popcountl and POPCNT via inline assembly, each with and without using OpenMP to divide the work amongst all cores.
+This project benchmarks various implementations of population count using direct bit manipulation, POPCNT via the gcc intrinsic __builtin_popcountl and POPCNT via inline assembly, with and without the use of OpenMP to divide the work amongst all cores.
 
 The main program benchmarks the implementations using data from /dev/urandom. To build it and test it with a small amount of data:
 make && make test
@@ -18,3 +18,19 @@ The text file results.txt has benchmark results on an EC2 c1.xlarge instance.
 More discussion on the population count problem:
 http://www.reddit.com/r/programming/comments/22p5v/popcount_the_nsa_instruction_missing_from_modern/
 http://chessprogramming.wikispaces.com/Population+Count
+
+
+
+Copyright 2011 Bobby Impollonia
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
