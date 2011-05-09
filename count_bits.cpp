@@ -26,6 +26,8 @@ int num_threads();
 // The SEE implementations work in long-sized chunks
 typedef const unsigned long chunk_t;
 const static int chunk_size = sizeof(chunk_t);
+// A function to calculate the bits set for a single chunk
+typedef long kernel_func(chunk_t _chunk);
 
 // How may trials to use for timing the slow and fast implementations
 const int naive_iters = 10;
@@ -66,43 +68,16 @@ long count_bits_table(const uchar *buffer, size_t bufsize)
     return bitcount;
 }
 
-long count_bits_kernighan(const uchar *buffer, size_t bufsize)
+// Count the bits by interating in word-sized chunks and
+// using a kernel function that operates on words.
+// Then, get the leftover bytes using the naive one-byte-at-a-time method.
+template <kernel_func func>
+long count_bits_kernel(const uchar *buffer, size_t bufsize)
 {
     long total = 0;
     const long num_chunks = bufsize / chunk_size;
     const size_t chunked_bufsize = num_chunks * chunk_size;
     const int leftover = bufsize - chunked_bufsize;
-
-#pragma omp parallel reduction (+:total)
-    {
-        long thread_total = 0;
-
-#pragma omp for
-        for (long i = 0; i < num_chunks; i++)
-        {
-            chunk_t _chunk = *reinterpret_cast<chunk_t *>(buffer + i * chunk_size);
-            long chunk = static_cast<long>(_chunk);
-            while (chunk)
-            {
-                thread_total++;
-                chunk &= chunk - 1;
-            }
-        }
-
-        total += thread_total;
-    }
-
-    total += count_bits_naive(buffer + chunked_bufsize, leftover);
-    return total;
-}
-
-// Count the bits using POPCNT instrinsic
-long count_bits_intrinsic(const uchar *buffer, size_t bufsize)
-{
-    const long num_chunks = bufsize / chunk_size;
-    const size_t chunked_bufsize = num_chunks * chunk_size;
-    const int leftover = bufsize - chunked_bufsize;
-    long total = 0;
 
 #pragma omp parallel reduction (+:total)
     {
@@ -112,7 +87,7 @@ long count_bits_intrinsic(const uchar *buffer, size_t bufsize)
         for (long i = 0; i < num_chunks; i++)
         {
             chunk_t chunk = *reinterpret_cast<chunk_t *>(buffer + i * chunk_size);
-            thread_total += __builtin_popcountl(chunk);
+            thread_total += func(chunk);
         }
 
         total += thread_total;
@@ -120,6 +95,35 @@ long count_bits_intrinsic(const uchar *buffer, size_t bufsize)
 
     total += count_bits_naive(buffer + chunked_bufsize, leftover);
     return total;
+}
+
+inline long kernighan_kernel(chunk_t _chunk)
+{
+    long chunk = static_cast<long>(_chunk);
+    long total = 0;
+    while (chunk)
+    {
+        total++;
+        chunk &= chunk - 1;
+    }
+    return total;
+}
+
+long count_bits_kernighan(const uchar *buffer, size_t bufsize)
+{
+    return count_bits_kernel<kernighan_kernel>(buffer, bufsize);
+}
+
+
+inline long intrinsic_kernel(chunk_t chunk)
+{
+    return __builtin_popcountl(chunk);
+}
+
+// Count the bits using POPCNT instrinsic
+long count_bits_intrinsic(const uchar *buffer, size_t bufsize)
+{
+    return count_bits_kernel<intrinsic_kernel>(buffer, bufsize);
 }
 
 // Count the bits using inline ASM with POPCNT
