@@ -150,7 +150,7 @@ long count_bits_asm(const uchar *buffer, size_t bufsize)
     for (int core = 0; core < num_cores; core++)
     {
         const uchar *mybuffer = buffer + core * bufsize_per_core;
-        const long num_bits = count_bits_asm(mybuffer, bufsize_per_core);
+        const long num_bits = count_bits_asm_chunked(mybuffer, bufsize_per_core);
         total += num_bits;
     }
 
