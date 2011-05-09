@@ -31,6 +31,7 @@ typedef long kernel_func(chunk_t _chunk);
 
 // How may trials to use for timing the slow and fast implementations
 const int naive_iters = 10;
+const int kernel_iters = 25;
 const int fast_iters = 100;
 
 
@@ -274,16 +275,14 @@ int main(int argc, char **argv)
     time_bit_counting("Naive implementation",
                       count_bits_naive, buffer, bufsize, naive_iters);
 
-    time_bit_counting("Lookup table implementation",
-                      count_bits_table, buffer, bufsize, naive_iters);
-
-    time_bit_counting("Brian Kernighan's method",
-                      count_bits_kernighan, buffer, bufsize, naive_iters);
-
     // Turn off parallelism
     int original_n_threads = num_threads();
     omp_set_num_threads(1);
 
+    time_bit_counting("Lookup table implementation (serial)",
+                      count_bits_table, buffer, bufsize, kernel_iters);
+    time_bit_counting("Brian Kernighan's method (serial)",
+                      count_bits_kernighan, buffer, bufsize, kernel_iters);
     time_bit_counting("Intrinsic implementation (serial)",
                       count_bits_intrinsic, buffer, bufsize);
     time_bit_counting("ASM implementation (serial)",
@@ -294,6 +293,10 @@ int main(int argc, char **argv)
         // Turn on parallelism
         omp_set_num_threads(original_n_threads);
 
+        time_bit_counting("Lookup table implementation (parallel)",
+                          count_bits_table, buffer, bufsize, kernel_iters);
+        time_bit_counting("Brian Kernighan's method (parallel)",
+                          count_bits_kernighan, buffer, bufsize, kernel_iters);
         time_bit_counting("Intrinsic implementation (parallel)",
                           count_bits_intrinsic, buffer, bufsize);
         time_bit_counting("ASM implementation (parallel)",
