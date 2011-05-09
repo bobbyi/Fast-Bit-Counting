@@ -42,8 +42,9 @@ long count_bits_naive(const uchar *buffer, size_t bufsize)
     return bitcount;
 }
 
-template <class type>
-long count_bits(type number)
+// Count bits in a number of arbitrary size
+template <class number_type>
+long count_bits(number_type number)
 {
     return count_bits_naive(reinterpret_cast<const uchar *>(&number), sizeof(number));
 }
